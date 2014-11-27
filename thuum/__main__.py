@@ -1,7 +1,6 @@
 import argparse
 import functools
 import sys
-import time
 
 from tornado import (
     httpclient,
@@ -18,7 +17,7 @@ if __name__ == "__main__" and __package__ == "":
     sys.path.append(parent_dir)
 
 from thuum import (
-    runner,
+    runners,
     stats,
 )
 
@@ -53,7 +52,7 @@ class AddHeader(argparse.Action):
 
 def get_argument_parser(parser=None):
     parser = parser or argparse.ArgumentParser(
-        description='Simple HTTP Load runner.')
+        description="Simple HTTP Load runner.")
 
     parser.add_argument(
         "-m", "--method",
@@ -72,27 +71,33 @@ def get_argument_parser(parser=None):
 
     parser.add_argument(
         "-c", "--concurrency",
-        help='Number of requests to make concurrently.',
+        help="Number of requests to make concurrently.",
         dest="concurrency",
         default=1,
         type=int)
 
     parser.add_argument(
         "-H", "--header", dest="headers",
-        help='Custom header. name:value',
+        help="Custom header. name:value",
         default=[], action=AddHeader)
 
     parser.add_argument(
-        '--json-output',
-        help='Prints the results in JSON instead of the default format',
-        action='store_true')
+        "--json-output",
+        help="Prints the results in JSON instead of the default format",
+        action="store_true")
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
-        '-n', '--requests', help='Number of requests',
+        "-n", "--requests",
+        help="Number of requests",
         type=int)
 
-    parser.add_argument('url', help='URL to hit')
+    group.add_argument(
+        "-d", "--duration",
+        help="Run load test for specified length of time.",
+        type=float)
+
+    parser.add_argument("url", help="URL to hit")
     return parser
 
 def main(argv=sys.argv[1:]):
@@ -117,13 +122,15 @@ def main(argv=sys.argv[1:]):
             args.headers,
             args.body)
 
-        runner_ = runner.Runner(client, make_request)
-        start = time.time()
-        responses = runner_.run(args.requests)
-        duration = time.time() - start
+        if args.duration:
+            runner = runners.DurationRunner(client, make_request)
+            records = runner.run(args.duration)
+        else:
+            runner = runners.QuantityRunner(client, make_request)
+            records = runner.run(args.requests)
 
-        stats.print_results(responses, duration)
-        stats.print_errors(responses)
+        stats.print_results(records)
+        stats.print_errors(records)
 
     except KeyboardInterrupt:
         sys.exit("Tests interrupted.")
