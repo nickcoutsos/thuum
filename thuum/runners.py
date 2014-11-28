@@ -59,7 +59,10 @@ class Runner(object):
 
 
 class QuantityRunner(Runner):
-    _remaining = None
+    def __init__(self, client, make_request, num_requests):
+        super(QuantityRunner, self).__init__(client, make_request)
+        self._total = num_requests
+        self._remaining = num_requests
 
     def _on_request_finished(self, _):
         if len(self._pending) == 0 and self._remaining == 0:
@@ -71,28 +74,49 @@ class QuantityRunner(Runner):
         self._remaining -= 1
         super(QuantityRunner, self)._start_request()
 
-    def run(self, num_requests):
-        self._remaining = num_requests
-
+    def run(self):
         # Start the number of desired requests, up to the maximum number of
         # desired concurrent requests.
-        for _ in xrange(min(num_requests, self.client.max_clients)):
+        for _ in xrange(min(self._total, self.client.max_clients)):
             self._start_request()
 
         # a single future which completes once all futures are complete.
         self.client.io_loop.start()
         return self._records
 
+    def progress(self):
+        sent = self._total - self._remaining
+        return {
+            "unit": "requests",
+            "total": self._total,
+            "current": sent,
+            "percentage": min(100.00, sent / float(self._total) * 100),
+        }
+
 
 class DurationRunner(Runner):
-    _timeout = None
+    def __init__(self, client, make_request, duration):
+        super(DurationRunner, self).__init__(client, make_request)
+        self._duration = duration
+        self._started = None
 
-    def run(self, duration):
+    def run(self):
+        self._started = time.time()
+
         # Start the number of desired requests, up to the maximum number of
         # desired concurrent requests.
         for _ in xrange(self.client.max_clients):
             self._start_request()
 
-        self.client.io_loop.call_later(duration, self.client.io_loop.stop)
+        self.client.io_loop.call_later(self._duration, self.client.io_loop.stop)
         self.client.io_loop.start()
         return self._records
+
+    def progress(self):
+        current = time.time() - self._started
+        return {
+            "unit": "seconds",
+            "total": self._duration,
+            "current": current,
+            "percentage": min(100.0, current / float(self._duration) * 100),
+        }

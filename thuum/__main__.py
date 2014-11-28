@@ -1,7 +1,9 @@
 import argparse
 import functools
 import sys
+import time
 
+import blessings
 from tornado import (
     httpclient,
     ioloop,
@@ -123,11 +125,23 @@ def main(argv=sys.argv[1:]):
             args.body)
 
         if args.duration:
-            runner = runners.DurationRunner(client, make_request)
-            records = runner.run(args.duration)
+            runner = runners.DurationRunner(client, make_request, args.duration)
         else:
-            runner = runners.QuantityRunner(client, make_request)
-            records = runner.run(args.requests)
+            runner = runners.QuantityRunner(client, make_request, args.requests)
+
+        terminal = blessings.Terminal()
+        template = "[{current:.1f}/{total:.1f} {unit}] {percentage:.1f}%"
+        def progress():
+            with terminal.location():
+                sys.stdout.write(template.format(**runner.progress()))
+                sys.stdout.flush()
+
+        client.io_loop.add_callback(progress)
+        ioloop.PeriodicCallback(progress, 1000).start()
+        records = runner.run()
+
+        progress()
+        print "\nDone!"
 
         stats.print_results(records)
         stats.print_errors(records)
