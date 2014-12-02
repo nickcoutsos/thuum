@@ -1,9 +1,7 @@
 import argparse
 import functools
 import sys
-import time
 
-import blessings
 from tornado import (
     httpclient,
     ioloop,
@@ -102,6 +100,7 @@ def get_argument_parser(parser=None):
     parser.add_argument("url", help="URL to hit")
     return parser
 
+
 def main(argv=sys.argv[1:]):
     parser = get_argument_parser()
 
@@ -129,22 +128,24 @@ def main(argv=sys.argv[1:]):
         else:
             runner = runners.QuantityRunner(client, make_request, args.requests)
 
-        terminal = blessings.Terminal()
-        template = "[{current:.1f}/{total:.1f} {unit}] {percentage:.1f}%"
+        tracker = stats.Tracker(runner)
+
         def progress():
-            with terminal.location():
-                sys.stdout.write(template.format(**runner.progress()))
-                sys.stdout.flush()
+            sys.stdout.write("\r")
+            sys.stdout.write(
+                stats.PROGRESS_TEMPLATE.format(**runner.progress()))
+            sys.stdout.flush()
 
         client.io_loop.add_callback(progress)
-        ioloop.PeriodicCallback(progress, 1000).start()
-        records = runner.run()
+        ioloop.PeriodicCallback(progress, 500, client.io_loop).start()
+        runner.run()
 
+        # One more progress call to ensure we're showing the final result.
         progress()
-        print "\nDone!"
 
-        stats.print_results(records)
-        stats.print_errors(records)
+        sys.stdout.write("\n")
+        stats.print_results(tracker.get_records())
+        stats.print_errors(tracker.get_records())
 
     except KeyboardInterrupt:
         sys.exit("Tests interrupted.")

@@ -1,32 +1,16 @@
 import time
 
+from pyee import EventEmitter
 from tornado import (
     concurrent,
 )
-
-class Record(object):
-    def __init__(self):
-        self.start = time.time()
-        self.finish = None
-        self.code = None
-        self.sent = 0
-        self.received = 0
-
-    def on_received(self, chunk):
-        self.received += len(chunk)
-
-    def complete(self, future):
-        response = future.result()
-        self.finish = time.time()
-        self.code = response.code
-
 
 class Runner(object):
     def __init__(self, client, make_request):
         self.client = client
         self.make_request = make_request
-        self._records = []
         self._pending = []
+        self.events = EventEmitter()
 
     def _on_request_finished(self, _):
         """
@@ -44,17 +28,16 @@ class Runner(object):
         the completion of a future we had prepared earlier.
 
         """
-        request = self.make_request()
+        request = self.make_request(streaming_callback=lambda c: None)
         future = concurrent.Future()
-        record = Record()
 
-        request.streaming_callback = record.on_received
+        self.events.emit("request_ready", future, request)
         self.client.fetch(request, callback=future.set_result)
+        self.events.emit("request_started", future)
 
         self._pending.append(future)
-        future.add_done_callback(record.complete)
+        future.add_done_callback(lambda f: self.events.emit("request_finished", f))
         future.add_done_callback(self._pending.remove)
-        future.add_done_callback(lambda f: self._records.append(record))
         future.add_done_callback(self._on_request_finished)
 
 
@@ -75,6 +58,7 @@ class QuantityRunner(Runner):
         super(QuantityRunner, self)._start_request()
 
     def run(self):
+        self.events.emit("tests_started")
         # Start the number of desired requests, up to the maximum number of
         # desired concurrent requests.
         for _ in xrange(min(self._total, self.client.max_clients)):
@@ -82,7 +66,7 @@ class QuantityRunner(Runner):
 
         # a single future which completes once all futures are complete.
         self.client.io_loop.start()
-        return self._records
+        self.events.emit("tests_finished")
 
     def progress(self):
         sent = self._total - self._remaining
@@ -101,6 +85,7 @@ class DurationRunner(Runner):
         self._started = None
 
     def run(self):
+        self.events.emit("tests_started")
         self._started = time.time()
 
         # Start the number of desired requests, up to the maximum number of
@@ -110,7 +95,7 @@ class DurationRunner(Runner):
 
         self.client.io_loop.call_later(self._duration, self.client.io_loop.stop)
         self.client.io_loop.start()
-        return self._records
+        self.events.emit("tests_finished")
 
     def progress(self):
         current = time.time() - self._started
