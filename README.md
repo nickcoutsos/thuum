@@ -12,7 +12,7 @@ requiring a single thread for execution.
 
 > *Boom!* is a script you can use to quickly smoke-test your
 web app deployment. If you need a more complex tool,
-I'd suggest looking at `Funkload <http://funkload.nuxeo.org/>`_.
+I'd suggest looking at `[Funkload](http://funkload.nuxeo.org/)`.
 
 > *Boom!* was specifically written to replace my Apache Bench usage,
 to provide a few missing features and fix a few annoyances I had
@@ -37,7 +37,8 @@ Thuum is the power of *Boom!* with the forceful winds of a tornado.
 
 I guess.
 
-*Thu'um* requires `tornado>=4.0` and currently only supports Python2.7.
+*Thu'um* requires `tornado>=4.0`, and `pyee`, and currently only supports
+Python2.7 because I've yet to dive into Python 3 and do not acknowledge 2.6.
 
 
 ## Basic usage
@@ -59,9 +60,14 @@ Basic usage example: 10000 requests with a maximum concurrency of 20 users:
 The output format has changed considerably. Other feature changes:
 
 * you can still send any number of requests with any level of concurrency
-* you **cannot** run tests for a specific length of time instead of requests
 * you **cannot** specify the "quiet" option
 * you **cannot** specify pre- and post-hooks for the requests and responses.
+* you **cannot** generate the request body via
 * you **absolutely cannot** cause dragons to fall from the sky.
 
-And more to come.
+Much of the actual test running and reporting has been refactored out of the
+script itself, so it's possible do implement your own custom test program with
+functionality from `thuum.runners` and `thuum.stats`... perhaps not completely
+dissimilar to what would be required to dynamically generate the requests.
+
+There's more to come.
