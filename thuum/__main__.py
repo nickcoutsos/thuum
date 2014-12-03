@@ -7,14 +7,16 @@ from tornado import (
     ioloop,
 )
 
-if __name__ == "__main__" and __package__ == "":
+def add_package_to_path():
+    if not (__name__ == "__main__" and __package__ == ""):
+        return
     import os
-    parent_dir = os.path.abspath(os.path.join(
+    sys.path.append(os.path.abspath(os.path.join(
         os.path.abspath(__file__),
         "..",
-        ".."))
+        "..")))
 
-    sys.path.append(parent_dir)
+add_package_to_path()
 
 from thuum import (
     runners,
@@ -80,11 +82,6 @@ def get_argument_parser(parser=None):
         "-H", "--header", dest="headers",
         help="Custom header. name:value",
         default=[], action=AddHeader)
-
-    parser.add_argument(
-        "--json-output",
-        help="Prints the results in JSON instead of the default format",
-        action="store_true")
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
