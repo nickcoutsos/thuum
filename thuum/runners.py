@@ -43,6 +43,7 @@ class Runner(object):
 
 class QuantityRunner(Runner):
     def __init__(self, client, make_request, num_requests):
+        assert num_requests > 0
         super(QuantityRunner, self).__init__(client, make_request)
         self._total = num_requests
         self._remaining = num_requests
@@ -80,6 +81,7 @@ class QuantityRunner(Runner):
 
 class DurationRunner(Runner):
     def __init__(self, client, make_request, duration):
+        assert duration > 0
         super(DurationRunner, self).__init__(client, make_request)
         self._duration = duration
         self._started = None

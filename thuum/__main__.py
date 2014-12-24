@@ -29,17 +29,14 @@ class UsageError(Exception):
         self.parser = parser
 
 class AddBody(argparse.Action):
-    def __call__(self, parser, namespace, values, option_stirng=None):
-        if len(values) == 0:
-            return
-        if len(values) > 1:
+    def __call__(self, parser, namespace, body, option_string=None):
+        if namespace.body is not None:
             raise UsageError("Cannot specify -b/--body more than once.", parser)
-        if namespace.method not in ("POST", "PUT"):
+        if namespace.method not in ("PATCH", "POST", "PUT"):
             raise UsageError(
                 "Cannot specify -b/--body with %r." % namespace.method,
                 parser)
 
-        body = values[0]
         if body.startswith("py:"):
             pass
         elif body.startswith("@"):
@@ -48,9 +45,11 @@ class AddBody(argparse.Action):
 
 class AddHeader(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        namespace.headers = [tuple(header.split(":")) for header in values]
-        if any(map(lambda p: len(p) != 2, namespace.headers)):
+        header = tuple(values.split(":"))
+        namespace.headers.append(header)
+        if len(header) != 2:
             raise UsageError("Headers must be of the form 'name:value'", parser)
+
 
 def get_argument_parser(parser=None):
     parser = parser or argparse.ArgumentParser(
@@ -83,7 +82,7 @@ def get_argument_parser(parser=None):
         help="Custom header. name:value",
         default=[], action=AddHeader)
 
-    group = parser.add_mutually_exclusive_group()
+    group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
         "-n", "--requests",
         help="Number of requests",
@@ -98,7 +97,7 @@ def get_argument_parser(parser=None):
     return parser
 
 
-def main(argv=sys.argv[1:]):
+def main(argv=sys.argv[1:], stdout=sys.stdout, stderr=sys.stderr):
     parser = get_argument_parser()
 
     try:
@@ -106,7 +105,7 @@ def main(argv=sys.argv[1:]):
     except UsageError as exception:
         sys.exit("%s\n\n%s" % (
             exception.message,
-            exception.parser.print_usage()
+            exception.parser.format_usage()
         ))
 
     httpclient.AsyncHTTPClient.configure(None, max_clients=args.concurrency)
@@ -128,10 +127,11 @@ def main(argv=sys.argv[1:]):
         tracker = stats.Tracker(runner)
 
         def progress():
-            sys.stdout.write("\r")
-            sys.stdout.write(
-                stats.PROGRESS_TEMPLATE.format(**runner.progress()))
-            sys.stdout.flush()
+            progress = runner.progress()
+            stdout.write("\r")
+            stdout.write(
+                stats.PROGRESS_TEMPLATE.format(**progress))
+            stdout.flush()
 
         client.io_loop.add_callback(progress)
         ioloop.PeriodicCallback(progress, 500, client.io_loop).start()
@@ -140,9 +140,9 @@ def main(argv=sys.argv[1:]):
         # One more progress call to ensure we're showing the final result.
         progress()
 
-        sys.stdout.write("\n")
-        stats.print_results(tracker.get_records())
-        stats.print_errors(tracker.get_records())
+        stdout.write("\n")
+        stats.print_results(tracker.get_records(), stdout)
+        stats.print_errors(tracker.get_records(), stderr)
 
     except KeyboardInterrupt:
         sys.exit("Tests interrupted.")

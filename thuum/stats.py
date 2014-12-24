@@ -7,13 +7,13 @@ PROGRESS_TEMPLATE = "[{current:.1f}/{total:.1f} {unit}] {percentage:.1f}%"
 
 TIMING_REPORT_TEMPLATE = """\
 Requests    {count:10}
-Duration    {dur:>10.4f}s
-Average     {avg:>10.4f}s
-Fastest     {min:>10.4f}s
-Slowest     {max:>10.4f}s
-Deviation   {dev:>10.4f}
+Duration    {dur:>15.4f}s
+Average     {avg:>15.4f}s
+Fastest     {min:>15.4f}s
+Slowest     {max:>15.4f}s
+Deviation   {dev:>15.4f}
 Received    {received:>10}B
-RPS         {rps:>10.2f}"""
+RPS         {rps:>13.2f}"""
 
 
 class Record(object):
@@ -88,6 +88,10 @@ def standard_deviation(values):
 
 def get_time_stats(results):
     completed = [r for r in results if r.finished is not None]
+
+    if len(completed) == 0:
+        return None
+
     times = [r.finished - r.started for r in completed]
     total = sum(times)
     count = len(times)
@@ -112,6 +116,9 @@ def get_time_stats(results):
 
 def print_results(results, stream=sys.stdout):
     stats = get_time_stats(results)
+    if stats is None:
+        stream.write("**No completed requests**")
+        return
     stream.write(TIMING_REPORT_TEMPLATE.format(**stats) + "\n")
 
 def print_errors(results, stream=sys.stderr):
