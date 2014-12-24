@@ -116,6 +116,9 @@ def get_time_stats(results):
 
 def print_results(results, stream=sys.stdout):
     stats = get_time_stats(results)
+    if stats is None:
+        stream.write("**No completed requests**")
+        return
     stream.write(TIMING_REPORT_TEMPLATE.format(**stats) + "\n")
 
 def print_errors(results, stream=sys.stderr):
