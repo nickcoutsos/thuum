@@ -1,10 +1,6 @@
 import mock
 import unittest
 
-from tornado import (
-    httpclient,
-)
-
 from thuum import runners
 from thuum.tests import utils
 
