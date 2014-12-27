@@ -19,6 +19,7 @@ def add_package_to_path():
 add_package_to_path()
 
 from thuum import (
+    reporters,
     runners,
     stats,
 )
@@ -50,6 +51,10 @@ class AddHeader(argparse.Action):
         if len(header) != 2:
             raise UsageError("Headers must be of the form 'name:value'", parser)
 
+class StoreMappedChoice(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        choice = self.choices[values]
+        setattr(namespace, self.dest, choice)
 
 def get_argument_parser(parser=None):
     parser = parser or argparse.ArgumentParser(
@@ -82,6 +87,17 @@ def get_argument_parser(parser=None):
         help="Custom header. name:value",
         default=[], action=AddHeader)
 
+    parser.add_argument(
+        "--reporter", dest="reporter_class",
+        help="Stats report format.",
+        action=StoreMappedChoice,
+        default=reporters.TerminalReporter,
+        choices={
+            "csv": reporters.CSVReporter,
+            "json": reporters.JSONReporter,
+            "term": reporters.TerminalReporter,
+        })
+
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
         "-n", "--requests",
@@ -97,7 +113,7 @@ def get_argument_parser(parser=None):
     return parser
 
 
-def main(argv=sys.argv[1:], stdout=sys.stdout, stderr=sys.stderr):
+def main(argv=sys.argv[1:], stdout=sys.stdout):
     parser = get_argument_parser()
 
     try:
@@ -124,25 +140,18 @@ def main(argv=sys.argv[1:], stdout=sys.stdout, stderr=sys.stderr):
         else:
             runner = runners.QuantityRunner(client, make_request, args.requests)
 
-        tracker = stats.Tracker(runner)
+        reporter = args.reporter_class(stdout)
+        progress = functools.partial(reporter.progress, runner)
 
-        def progress():
-            progress = runner.progress()
-            stdout.write("\r")
-            stdout.write(
-                stats.PROGRESS_TEMPLATE.format(**progress))
-            stdout.flush()
+        tracker = stats.Tracker(runner)
+        tracker.events.on("request_finished", reporter.record)
+        tracker.events.on("tests_finished", lambda t: progress())
+        tracker.events.on("tests_finished", reporter.summarize)
 
         client.io_loop.add_callback(progress)
         ioloop.PeriodicCallback(progress, 500, client.io_loop).start()
+
         runner.run()
-
-        # One more progress call to ensure we're showing the final result.
-        progress()
-
-        stdout.write("\n")
-        stats.print_results(tracker.get_records(), stdout)
-        stats.print_errors(tracker.get_records(), stderr)
 
     except KeyboardInterrupt:
         sys.exit("Tests interrupted.")

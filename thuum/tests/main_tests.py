@@ -2,7 +2,11 @@ import mock
 import StringIO
 import unittest
 
-from thuum import __main__ as main_
+from thuum import (
+    __main__ as main_,
+    reporters,
+    runners,
+)
 
 class ExitException(Exception):
     pass
@@ -25,6 +29,19 @@ def mock_tracker(*_):
         mock.MagicMock(started=0, finished=100, code=200, sent=0, received=100),
     ]
     return tracker
+
+class ZeroQuantityRunner(runners.QuantityRunner):
+    def run(self, *args):
+        self._total = 0
+        self._remaining = 0
+        super(ZeroQuantityRunner, self).run(*args)
+
+def zero_quantity_runner(*args):
+    runner = runners.QuantityRunner(*args)
+    runner._total = 0
+    runner._remaining = 0
+    return runner
+
 
 @mock.patch("sys.stderr", new_callable=StringIO.StringIO)
 @mock.patch("sys.exit", side_effect=ExitException)
@@ -59,30 +76,9 @@ class Function_main_Tests(unittest.TestCase):
         exit_call_arg = sys_exit.call_args[0][0]
         self.assertIn("usage:", exit_call_arg)
 
-    @mock.patch("thuum.runners.QuantityRunner", new=mock_runner)
-    def test_zero_requests_run(self, *_):
-        stdout = StringIO.StringIO()
-        args = ["http://localhost:8080", "-n10"]
-
-        main_.main(args, stdout)
-
-        self.assertIn("**No completed requests**", stdout.getvalue())
-
-    @mock.patch("thuum.stats.Tracker", new=mock_tracker)
-    @mock.patch("thuum.runners.QuantityRunner", new=mock_runner)
     def test_requests_run(self, *_):
         stdout = StringIO.StringIO()
         args = ["http://localhost:8080", "-n10", "--header", "Host:foo"]
-
-        main_.main(args, stdout)
-
-        self.assertRegexpMatches(stdout.getvalue(), self.OUTPUT_LINES_PATTERN)
-
-    @mock.patch("thuum.stats.Tracker", new=mock_tracker)
-    @mock.patch("thuum.runners.DurationRunner", new=mock_runner)
-    def test_duration_run(self, *_):
-        stdout = StringIO.StringIO()
-        args = ["http://localhost:8080", "-d10"]
 
         main_.main(args, stdout)
 
@@ -135,3 +131,10 @@ class ParserTests(unittest.TestCase):
 
         self.assertIn("more than once", context.exception.message)
 
+    def test_use_custom_reporter(self):
+        args = ["--reporter", "csv"]
+        parser = main_.get_argument_parser()
+
+        args = parser.parse_args(["http://localhost:8080/", "-n1"] + args)
+
+        self.assertEqual(args.reporter_class, reporters.CSVReporter)
