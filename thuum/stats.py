@@ -1,7 +1,7 @@
-import collections
 import math
-import sys
 import time
+
+from pyee import EventEmitter
 
 PROGRESS_TEMPLATE = "[{current:.1f}/{total:.1f} {unit}] {percentage:.1f}%"
 
@@ -38,6 +38,7 @@ class Record(object):
 
 class Tracker(object):
     def __init__(self, runner=None):
+        self.events = EventEmitter()
         self.started = None
         self.finished = None
         self.requests = 0
@@ -62,6 +63,7 @@ class Tracker(object):
 
     def tests_finished(self):
         self.finished = time.time()
+        self.events.emit("tests_finished", self)
 
     def request_ready(self, future, request):
         record = Record()
@@ -75,6 +77,7 @@ class Tracker(object):
     def request_finished(self, future):
         record = self._pending.pop(future)
         record.complete(future)
+        self.events.emit("request_finished", record)
 
 
 def standard_deviation(values):
@@ -113,19 +116,3 @@ def get_time_stats(results):
     }
 
     return stats
-
-def print_results(results, stream=sys.stdout):
-    stats = get_time_stats(results)
-    if stats is None:
-        stream.write("**No completed requests**")
-        return
-    stream.write(TIMING_REPORT_TEMPLATE.format(**stats) + "\n")
-
-def print_errors(results, stream=sys.stderr):
-    codes = collections.Counter([
-        r.code for r in results
-        if r.code >= 300
-    ])
-
-    for code, count in codes.iteritems():
-        stream.write("%d errors: %d\n" % (code, count))
