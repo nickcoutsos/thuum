@@ -1,5 +1,4 @@
 from setuptools import setup
-from thuum import __version__
 
 def read_requirements(path):
     with open(path) as f:
@@ -8,7 +7,7 @@ def read_requirements(path):
 
 setup(
     name="thuum",
-    version=__version__,
+    version="0.1.1",
     url="https://github.com/nickcoutsos/thuum",
     packages=[
         "thuum",
