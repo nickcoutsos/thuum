@@ -1,4 +1,4 @@
-# Thu'um
+# Thu'um [![Build Status](https://travis-ci.org/nickcoutsos/thuum.svg)](https://travis-ci.org/nickcoutsos/thuum) [![Coverage Status](https://coveralls.io/repos/nickcoutsos/thuum/badge.svg?branch=master)](https://coveralls.io/r/nickcoutsos/thuum?branch=master)
 
 *(or `thuum`)*
 
